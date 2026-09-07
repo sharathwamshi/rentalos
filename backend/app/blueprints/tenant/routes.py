@@ -142,7 +142,7 @@ def list_agreements():
         [
             {"id": a.id, "agreement_number": a.agreement_number, "unit": a.room.unit_number,
              "start_date": a.start_date.isoformat(), "end_date": a.end_date.isoformat(), "status": a.status,
-             "tenant_signed": bool(a.tenant_signed_at)}
+             "tenant_signed": bool(a.tenant_signed_at), "is_uploaded": a.is_uploaded}
             for a in rows
         ]
     )
@@ -159,6 +159,7 @@ def agreement_detail(agreement_id):
             "security_deposit": float(a.security_deposit or 0),
             "property": a.room.property.name, "unit_number": a.room.unit_number, "location": a.room.property.location,
             "tenant_signed": bool(a.tenant_signed_at), "owner_signed": bool(a.owner_signed_at),
+            "is_uploaded": a.is_uploaded,
         }
     )
 
@@ -250,7 +251,8 @@ def invoice_pdf(invoice_id):
     tenant = _tenant_profile()
     invoice = Invoice.query.filter_by(id=invoice_id, tenant_id=tenant.id).first_or_404()
     folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "invoices")
-    path = render_invoice_pdf(invoice, invoice.room.property.owner.user, invoice.tenant.user, invoice.room, folder)
+    path = render_invoice_pdf(invoice, invoice.room.property.owner.user, invoice.tenant.user, invoice.room, folder,
+                               owner_profile=invoice.room.property.owner)
     return send_file(path, as_attachment=True)
 
 

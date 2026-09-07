@@ -37,7 +37,7 @@ export default function OwnerDashboard() {
     <div>
       <PageHeader
         title={`Welcome back, ${data.owner_name?.split(" ")[0]}`}
-        subtitle={data.plan_name ? `${data.plan_name} plan \u00b7 Overview of your properties, rooms, and status` : "Overview of your properties, rooms, and status"}
+        subtitle={data.plan_name ? `${data.plan_name} plan · Overview of your properties, rooms, and status` : "Overview of your properties, rooms, and status"}
       />
 
       {/* Quick actions */}
@@ -88,7 +88,7 @@ export default function OwnerDashboard() {
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard icon={IndianRupee} label="Revenue this month" value={`\u20b9${data.revenue_this_month.toLocaleString("en-IN")}`} accent="bg-emerald-500" />
+            <StatCard icon={IndianRupee} label="Revenue this month" value={`₹${data.revenue_this_month.toLocaleString("en-IN")}`} accent="bg-emerald-500" />
             <StatCard icon={Home} label="Occupancy" value={`${data.occupancy_pct}%`} sub={`${data.occupied} of ${data.total_rooms} rooms`} accent="bg-brand-gradient" />
             <StatCard icon={Clock} label="Close to expire" value={data.close_to_expire} sub="Rooms" accent="bg-amber-500" />
             <StatCard icon={Wrench} label="Maintenance" value={data.maintenance} sub="Rooms" accent="bg-rose-500" />
@@ -133,9 +133,9 @@ export default function OwnerDashboard() {
                     <div key={i} className="flex items-center justify-between text-sm border-b border-slate-50 pb-2.5 last:border-0 last:pb-0">
                       <div>
                         <p className="font-medium text-ink">{p.tenant_name}</p>
-                        <p className="text-xs text-slate-400">{p.unit} \u00b7 {p.method}</p>
+                        <p className="text-xs text-slate-400">{p.unit} · {p.method}</p>
                       </div>
-                      <span className="font-mono font-semibold">\u20b9{p.amount.toLocaleString("en-IN")}</span>
+                      <span className="font-mono font-semibold">₹{p.amount.toLocaleString("en-IN")}</span>
                     </div>
                   ))}
                 </div>

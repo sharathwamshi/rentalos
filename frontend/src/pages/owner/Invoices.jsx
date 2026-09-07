@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
-import { Plus, FileDown, Eye, Receipt } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, FileDown, Eye, Receipt, CheckCircle2 } from "lucide-react";
 import api from "../../api/client";
 import { PageHeader, Modal, EmptyState, StatusPill, Spinner } from "../../components/ui";
 
+function pdfUrl(path) {
+  const token = localStorage.getItem("access_token");
+  return `${path}?token=${encodeURIComponent(token || "")}`;
+}
+
 export default function Invoices() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState(null);
   const [status, setStatus] = useState("all");
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState({ tenant_id: "", room_id: "", billing_month: "", due_date: "", rent: "", electricity: 0, water: 0, maintenance: 0, other_charges: 0 });
-  const [payForm, setPayForm] = useState({ amount: "", method: "cash", reference: "", notes: "" });
   const [saving, setSaving] = useState(false);
 
   const load = () => api.get("/owner/invoices", { params: { status } }).then((r) => setRows(r.data));
@@ -37,22 +42,10 @@ export default function Invoices() {
     }
   };
 
-  const openView = async (id) => {
-    const { data } = await api.get(`/owner/invoices/${id}`);
-    setView(data);
-    setPayForm({ amount: data.balance, method: "cash", reference: "", notes: "" });
-  };
-
-  const addPayment = async (e) => {
-    e.preventDefault();
-    await api.post(`/owner/invoices/${view.id}/payments`, payForm);
-    const { data } = await api.get(`/owner/invoices/${view.id}`);
-    setView(data);
+  const markPaid = async (id) => {
+    await api.post(`/owner/invoices/${id}/mark-paid`);
     load();
   };
-
-  const markPaid = async (id) => { await api.post(`/owner/invoices/${id}/mark-paid`); load(); if (view) openView(view.id); };
-  const downloadPdf = (id) => window.open(`/api/owner/invoices/${id}/pdf`, "_blank");
 
   if (!rows) return <Spinner />;
 
@@ -83,9 +76,14 @@ export default function Invoices() {
                   <td className="font-mono">₹{i.total.toLocaleString("en-IN")}</td>
                   <td><StatusPill status={i.status} /></td>
                   <td>
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => openView(i.id)} className="text-slate-400 hover:text-brand-600"><Eye size={16} /></button>
-                      <button onClick={() => downloadPdf(i.id)} className="text-slate-400 hover:text-brand-600"><FileDown size={16} /></button>
+                    <div className="flex items-center gap-3 justify-end">
+                      {i.status !== "paid" && (
+                        <button onClick={() => markPaid(i.id)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                          <CheckCircle2 size={14} /> Mark as paid
+                        </button>
+                      )}
+                      <button onClick={() => navigate(`/owner/invoices/${i.id}`)} className="text-slate-400 hover:text-brand-600" title="View"><Eye size={16} /></button>
+                      <a href={pdfUrl(`/api/owner/invoices/${i.id}/pdf`)} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-600" title="Download PDF"><FileDown size={16} /></a>
                     </div>
                   </td>
                 </tr>
@@ -118,56 +116,6 @@ export default function Invoices() {
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
           </div>
         </form>
-      </Modal>
-
-      <Modal open={!!view} onClose={() => setView(null)} title={view?.invoice_number} wide>
-        {view && (
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-semibold text-sm">Charges</p><StatusPill status={view.status} />
-              </div>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Rent</span><span>₹{view.rent}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Electricity</span><span>₹{view.electricity}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Water</span><span>₹{view.water}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Maintenance</span><span>₹{view.maintenance}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Late fee</span><span>₹{view.late_fee}</span></div>
-                <div className="flex justify-between font-bold border-t pt-1.5 mt-1.5"><span>Total</span><span>₹{view.total}</span></div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-4">
-                {[["Subtotal", view.total], ["Paid", view.paid_amount], ["Balance", view.balance]].map(([l, v]) => (
-                  <div key={l} className="rounded-lg bg-slate-50 p-2.5 text-center">
-                    <p className="text-[10px] uppercase text-slate-400 font-semibold">{l}</p>
-                    <p className="font-mono font-bold text-sm">₹{v}</p>
-                  </div>
-                ))}
-              </div>
-              {view.status !== "paid" && (
-                <button onClick={() => markPaid(view.id)} className="btn-secondary w-full mt-3 text-xs !py-2">Mark as paid</button>
-              )}
-            </div>
-            <div>
-              <p className="font-semibold text-sm mb-3">Add payment</p>
-              <form onSubmit={addPayment} className="space-y-3">
-                <div><label className="label">Amount</label><input type="number" className="input" required value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} /></div>
-                <div><label className="label">Method</label><input className="input" placeholder="cash, bank_transfer..." value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })} /></div>
-                <div><label className="label">Reference</label><input className="input" value={payForm.reference} onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })} /></div>
-                <div><label className="label">Notes</label><textarea className="input" rows={2} value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} /></div>
-                <button className="btn-primary w-full">Add payment</button>
-              </form>
-              <p className="font-semibold text-sm mt-5 mb-2">Payment history</p>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {view.payments.length === 0 ? <p className="text-xs text-slate-400">No payments found.</p> :
-                  view.payments.map((p, i) => (
-                    <div key={i} className="flex justify-between text-xs border-b border-slate-50 pb-1.5">
-                      <span>{p.method} — {p.paid_at?.slice(0, 10)}</span><span className="font-mono">₹{p.amount}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   );

@@ -99,7 +99,7 @@ export default function RoomAssignments() {
                   <td className="font-medium text-ink">{a.unit}</td>
                   <td>{a.tenant_name}</td>
                   <td>{a.assigned_at}</td>
-                  <td>{a.vacated_at || "\u2014"}</td>
+                  <td>{a.vacated_at || "—"}</td>
                   <td className="text-right">
                     {a.is_active && <button onClick={() => vacate(a.id)} className="btn-secondary !py-1.5 !px-3 text-xs">Vacate</button>}
                   </td>
@@ -209,7 +209,7 @@ export default function RoomAssignments() {
 
       <Modal open={addTenantOpen} onClose={() => setAddTenantOpen(false)} title="Add new tenant">
         <form onSubmit={createTenantInline} className="space-y-4">
-          <p className="text-xs text-slate-400 -mt-2">Just the basics for now \u2014 you can fill in ID proof, address, and emergency contact anytime from the Tenants page.</p>
+          <p className="text-xs text-slate-400 -mt-2">Just the basics for now — you can fill in ID proof, address, and emergency contact anytime from the Tenants page.</p>
           <div><label className="label">Full name</label><input className="input" required value={newTenant.full_name} onChange={(e) => setNewTenant({ ...newTenant, full_name: e.target.value })} /></div>
           <div><label className="label">Email</label><input className="input" type="email" required value={newTenant.email} onChange={(e) => setNewTenant({ ...newTenant, email: e.target.value })} /></div>
           <div><label className="label">Phone</label><input className="input" value={newTenant.phone} onChange={(e) => setNewTenant({ ...newTenant, phone: e.target.value })} /></div>

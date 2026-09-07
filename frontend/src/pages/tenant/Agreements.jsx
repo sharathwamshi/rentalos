@@ -67,11 +67,13 @@ export default function TenantAgreements() {
                   <td className="font-medium text-ink">{a.agreement_number}</td>
                   <td>{a.unit}</td>
                   <td>{a.start_date} – {a.end_date}</td>
-                  <td><StatusPill status={a.status} /></td>
+                  <td>
+                    {a.is_uploaded ? <span className="pill-brand">Uploaded</span> : <StatusPill status={a.status} />}
+                  </td>
                   <td>
                     <div className="flex gap-2 justify-end">
                       <button className="btn-secondary !py-1.5 !px-3 text-xs" onClick={() => openView(a.id)}>View</button>
-                      <button onClick={() => window.open(`/api/owner/agreements/${a.id}/pdf`, "_blank")} className="text-slate-400 hover:text-tenant-600"><FileDown size={16} /></button>
+                      <button onClick={() => window.open(`/api/owner/agreements/${a.id}/pdf?token=${encodeURIComponent(localStorage.getItem("access_token") || "")}`, "_blank")} className="text-slate-400 hover:text-tenant-600"><FileDown size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -96,7 +98,15 @@ export default function TenantAgreements() {
                 <Row l="Property" v={view.property} /><Row l="Unit number" v={view.unit_number} /><Row l="Location" v={view.location} />
               </div>
             </div>
-            {!view.tenant_signed ? (
+            {view.is_uploaded ? (
+              <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 flex items-center gap-3">
+                <FileDown size={18} className="text-brand-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-sm text-ink">This agreement was uploaded by your owner</p>
+                  <p className="text-xs text-slate-500">Already signed outside RentalOS — no action needed. Download it below anytime.</p>
+                </div>
+              </div>
+            ) : !view.tenant_signed ? (
               <div className="rounded-xl border border-tenant-200 bg-cyan-50/50 p-4">
                 <div className="flex items-center gap-2 mb-2"><PenLine size={16} className="text-tenant-600" /><p className="font-semibold text-sm">Sign this agreement</p></div>
                 <p className="text-xs text-slate-500 mb-3">Type your full legal name exactly as on file to accept.</p>

@@ -103,6 +103,14 @@ export default function DashboardShell({ nav, title, subtitle, children, unreadC
               </button>
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white shadow-card-hover border border-slate-100 py-1.5 z-30">
+                  {user?.role === "owner" && (
+                    <button
+                      onClick={() => { setMenuOpen(false); navigate("/owner/profile"); }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                      My Profile
+                    </button>
+                  )}
                   <button
                     onClick={logout}
                     className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"

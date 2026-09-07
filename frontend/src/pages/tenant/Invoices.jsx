@@ -86,7 +86,7 @@ export default function TenantInvoices() {
                   <td>
                     <div className="flex gap-2 justify-end">
                       <button className="btn-secondary !py-1.5 !px-3 text-xs" onClick={() => openView(i.id)}>View</button>
-                      <button onClick={() => window.open(`/api/tenant/invoices/${i.id}/pdf`, "_blank")} className="text-slate-400 hover:text-tenant-600"><FileDown size={16} /></button>
+                      <button onClick={() => window.open(`/api/tenant/invoices/${i.id}/pdf?token=${encodeURIComponent(localStorage.getItem("access_token") || "")}`, "_blank")} className="text-slate-400 hover:text-tenant-600"><FileDown size={16} /></button>
                     </div>
                   </td>
                 </tr>

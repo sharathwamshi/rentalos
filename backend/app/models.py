@@ -63,6 +63,15 @@ class OwnerProfile(db.Model):
     subscription_renews_at = db.Column(db.Date)
     telegram_chat_id = db.Column(db.String(64))  # for admin -> owner telegram alerts
 
+    # Profile / business details (shown on Owner > Profile, printed on invoices & agreements)
+    business_logo_url = db.Column(db.String(255))
+    property_address = db.Column(db.Text)
+    ownership_type = db.Column(db.Enum("single", "joint", name="ownership_type"), default="single")
+    joint_level = db.Column(db.String(20))
+    invoice_prefix = db.Column(db.String(30))
+    pan_number = db.Column(db.String(20))
+    pan_upload_url = db.Column(db.String(255))
+
     plan = db.relationship("SubscriptionPlan")
     properties = db.relationship("Property", backref="owner", cascade="all, delete-orphan")
 
@@ -167,6 +176,7 @@ class Agreement(db.Model):
     status = db.Column(db.Enum("active", "expired", "terminated", name="agreement_status"), default="active")
     auto_renew_pct = db.Column(db.Numeric(5, 2), default=10.0)
     pdf_url = db.Column(db.String(255))
+    is_uploaded = db.Column(db.Boolean, default=False)  # owner uploaded an existing signed agreement instead of generating one
 
     # e-signature
     tenant_signed_at = db.Column(db.DateTime)

@@ -14,6 +14,8 @@ import Tenants from "./pages/owner/Tenants";
 import RoomAssignments from "./pages/owner/RoomAssignments";
 import Agreements from "./pages/owner/Agreements";
 import Invoices from "./pages/owner/Invoices";
+import InvoiceView from "./pages/owner/InvoiceView";
+import OwnerProfile from "./pages/owner/Profile";
 import Reports from "./pages/owner/Reports";
 import Subscription from "./pages/owner/Subscription";
 import Maintenance from "./pages/owner/Maintenance";
@@ -55,6 +57,8 @@ export default function App() {
               <Route path="assignments" element={<RoomAssignments />} />
               <Route path="agreements" element={<Agreements />} />
               <Route path="invoices" element={<Invoices />} />
+              <Route path="invoices/:id" element={<InvoiceView />} />
+              <Route path="profile" element={<OwnerProfile />} />
               <Route path="maintenance" element={<Maintenance />} />
               <Route path="messages" element={<Messages />} />
               <Route path="reports" element={<Reports />} />

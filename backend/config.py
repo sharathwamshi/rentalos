@@ -10,6 +10,12 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=12)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    # PDFs are opened with window.open() in a new tab, which can't attach an
+    # Authorization header -- without this, every "View PDF" / "Download"
+    # button would 401 even for a logged-in user. Accepting the token as a
+    # ?token= query param (in addition to the header) fixes that.
+    JWT_TOKEN_LOCATION = ["headers", "query_string"]
+    JWT_QUERY_STRING_NAME = "token"
 
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "3306")

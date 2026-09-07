@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, date
-from flask import Blueprint, request, jsonify, current_app, send_file
+from flask import Blueprint, request, jsonify, current_app, send_file, redirect
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.extensions import db
@@ -28,6 +28,49 @@ def _room_limit_ok(owner):
         db.session.query(Room).join(Property).filter(Property.owner_id == owner.id).count()
     )
     return total_rooms < owner.plan.room_limit
+
+
+# --------------------------- PROFILE ----------------------------------------
+@bp.get("/profile")
+@roles_required("owner")
+def get_profile():
+    owner = _owner_profile()
+    u = owner.user
+    return jsonify(
+        {
+            "full_name": u.full_name,
+            "email": u.email,
+            "phone": u.phone,
+            "business_logo_url": owner.business_logo_url,
+            "property_address": owner.property_address,
+            "gst_number": owner.gst_number,
+            "ownership_type": owner.ownership_type,
+            "joint_level": owner.joint_level,
+            "invoice_prefix": owner.invoice_prefix,
+            "pan_number": owner.pan_number,
+            "pan_upload_url": owner.pan_upload_url,
+            "plan_name": owner.plan.name if owner.plan else None,
+            "subscription_status": owner.subscription_status,
+            "member_since": u.created_at.isoformat(),
+        }
+    )
+
+
+@bp.put("/profile")
+@roles_required("owner")
+def update_profile():
+    owner = _owner_profile()
+    data = request.get_json(force=True)
+    u = owner.user
+    for f in ["full_name", "phone"]:
+        if f in data:
+            setattr(u, f, data[f])
+    for f in ["business_logo_url", "property_address", "gst_number", "ownership_type", "joint_level",
+              "invoice_prefix", "pan_number", "pan_upload_url"]:
+        if f in data:
+            setattr(owner, f, data[f])
+    db.session.commit()
+    return jsonify({"message": "Profile updated."})
 
 
 # --------------------------- DASHBOARD ------------------------------------
@@ -436,6 +479,7 @@ def _agreement_dict(a):
         "security_deposit": float(a.security_deposit or 0),
         "owner_signed": bool(a.owner_signed_at),
         "tenant_signed": bool(a.tenant_signed_at),
+        "is_uploaded": a.is_uploaded,
     }
 
 
@@ -445,7 +489,11 @@ def create_agreement():
     owner = _owner_profile()
     data = request.get_json(force=True)
     room = Room.query.get_or_404(data["room_id"])
-    number = f"AGM-{datetime.utcnow().strftime('%Y%m%d')}-{Agreement.query.count()+1:04d}"
+    number = data.get("agreement_number") or f"AGM-{datetime.utcnow().strftime('%Y%m%d')}-{Agreement.query.count()+1:04d}"
+    if Agreement.query.filter_by(agreement_number=number).first():
+        return jsonify({"error": f"Agreement number {number} is already in use."}), 409
+
+    is_uploaded = bool(data.get("is_uploaded"))
     agreement = Agreement(
         agreement_number=number,
         room_id=room.id,
@@ -456,9 +504,22 @@ def create_agreement():
         security_deposit=data.get("security_deposit", 0),
         start_date=datetime.strptime(data["start_date"], "%Y-%m-%d").date(),
         end_date=datetime.strptime(data["end_date"], "%Y-%m-%d").date(),
-        owner_signed_at=datetime.utcnow(),
-        owner_signature_name=owner.user.full_name,
+        is_uploaded=is_uploaded,
     )
+    if is_uploaded:
+        # Owner already has a signed agreement on file -- store it as-is,
+        # skip the generated-PDF / e-signature flow entirely.
+        if not data.get("pdf_url"):
+            return jsonify({"error": "Please upload the agreement file first."}), 400
+        agreement.pdf_url = data["pdf_url"]
+        agreement.owner_signed_at = datetime.utcnow()
+        agreement.owner_signature_name = owner.user.full_name
+        agreement.tenant_signed_at = datetime.utcnow()
+        agreement.tenant_signature_name = "Uploaded document (signed outside RentalOS)"
+    else:
+        agreement.owner_signed_at = datetime.utcnow()
+        agreement.owner_signature_name = owner.user.full_name
+
     db.session.add(agreement)
     db.session.commit()
     return jsonify({"message": "Agreement created.", "id": agreement.id, "agreement_number": number}), 201
@@ -468,6 +529,8 @@ def create_agreement():
 @roles_required("owner", "tenant")
 def agreement_pdf(agreement_id):
     agreement = Agreement.query.get_or_404(agreement_id)
+    if agreement.is_uploaded and agreement.pdf_url:
+        return redirect(agreement.pdf_url)
     folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "agreements")
     path = render_agreement_pdf(agreement, agreement.room.property.owner.user, agreement.tenant.user, folder)
     return send_file(path, as_attachment=True)
@@ -533,7 +596,9 @@ def create_invoice():
     room = Room.query.get_or_404(data["room_id"])
     charges = ["rent", "electricity", "water", "maintenance", "other_charges", "late_fee"]
     total = sum(float(data.get(c, 0) or 0) for c in charges)
-    number = f"INV-{datetime.utcnow().strftime('%Y%m%d')}-{Invoice.query.count()+1:04d}"
+    prefix = owner.invoice_prefix or f"INV-{datetime.utcnow().year}"
+    existing_count = Invoice.query.filter_by(owner_id=owner.id).count()
+    number = f"{prefix}-{existing_count + 1:04d}"
     invoice = Invoice(
         invoice_number=number,
         room_id=room.id,
@@ -554,12 +619,31 @@ def create_invoice():
 @roles_required("owner", "tenant")
 def invoice_detail(invoice_id):
     i = Invoice.query.get_or_404(invoice_id)
+    owner = i.room.property.owner
+    agreement = (
+        Agreement.query.filter_by(room_id=i.room_id, tenant_id=i.tenant_id, status="active")
+        .order_by(Agreement.created_at.desc()).first()
+    )
     return jsonify(
         {
             **_invoice_dict(i),
             "rent": float(i.rent or 0), "electricity": float(i.electricity or 0),
             "water": float(i.water or 0), "maintenance": float(i.maintenance or 0),
             "other_charges": float(i.other_charges or 0), "late_fee": float(i.late_fee or 0),
+            "rent_type": i.rent_type,
+            "created_at": i.created_at.isoformat(),
+            "paid_date": i.paid_date.isoformat() if i.paid_date else None,
+            "tenant_email": i.tenant.user.email,
+            "tenant_phone": i.tenant.user.phone,
+            "property_name": i.room.property.name,
+            "property_location": i.room.property.location,
+            "unit_number": i.room.unit_number,
+            "agreement_number": agreement.agreement_number if agreement else None,
+            "agreement_id": agreement.id if agreement else None,
+            "owner_name": owner.user.full_name,
+            "owner_email": owner.user.email,
+            "owner_gst_pan": owner.gst_number or owner.pan_number,
+            "owner_property_address": owner.property_address,
             "payments": [
                 {"amount": float(p.amount), "method": p.method, "paid_at": p.paid_at.isoformat(), "reference": p.reference}
                 for p in i.payments
@@ -606,7 +690,8 @@ def mark_paid(invoice_id):
 def invoice_pdf(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
     folder = os.path.join(current_app.config["UPLOAD_FOLDER"], "invoices")
-    path = render_invoice_pdf(invoice, invoice.room.property.owner.user, invoice.tenant.user, invoice.room, folder)
+    path = render_invoice_pdf(invoice, invoice.room.property.owner.user, invoice.tenant.user, invoice.room, folder,
+                               owner_profile=invoice.room.property.owner)
     return send_file(path, as_attachment=True)
 
 
